@@ -31,7 +31,7 @@ func main() {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	timer := time.NewTicker(time.Minute * 1)
+	timer := time.NewTicker(time.Minute * 2)
 
 	go func() {
 		for {
@@ -41,12 +41,10 @@ func main() {
 				res, err := http.Get("http://poetempest.com/api/v0/current_tempests")
 				if err != nil {
 					fmt.Println(err.Error())
-					// handle error
+					return
 				}
 				defer res.Body.Close()
 				body, err := ioutil.ReadAll(res.Body)
-
-				fmt.Println("processing update")
 
 				currentTempests := map[string]*Tempest{}
 				update := map[string]*Tempest{}
@@ -68,15 +66,15 @@ func main() {
 						previousTempest, ok := tempestCache[key]
 
 						if !ok || previousTempest.Name != currentTempest.Name {
-							if ok {
-								fmt.Println(key, "changed from", previousTempest.Name, "to", currentTempest.Name)
-
-							}
 							tempestCache[key] = currentTempest
 							update[key] = currentTempest
 							updatedMaps++
-						}
 
+							if ok {
+								fmt.Println(key, "changed from", previousTempest.Name, "to", currentTempest.Name)
+							}
+
+						}
 					}
 				}()
 
@@ -93,11 +91,9 @@ func main() {
 					hub.Broadcast(up)
 				}
 
-				fmt.Println(updatedMaps, "updates")
 			}()
 
 			<-timer.C
-
 		}
 	}()
 
@@ -145,19 +141,14 @@ func eventSource(w http.ResponseWriter, req *http.Request) {
 	}()
 
 	for {
-
 		select {
 		case <-disconnect:
 			return
-
 		case update := <-uc.Queue:
-
 			rw.Write([]byte("event: " + update.Event + "\r\n"))
 			rw.Write([]byte("data: " + update.Message + "\r\n\r\n"))
 			rw.Flush()
-
 		}
 
 	}
-
 }
